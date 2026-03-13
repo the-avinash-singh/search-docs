@@ -1,0 +1,118 @@
+{
+  "info": {
+    "name": "Distributed Document Search Service",
+    "_postman_id": "00000000-0000-0000-0000-000000000000",
+    "description": "Sample Postman collection for the distributed document search prototype.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Create Document",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Tenant-Id",
+            "value": "tenant-a"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Distributed Systems Basics\",\n  \"content\": \"This document introduces distributed systems and scalability concepts.\",\n  \"metadata\": { \"category\": \"intro\" }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/documents",
+          "host": ["{{baseUrl}}"],
+          "path": ["documents"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Documents",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/search?q=distributed&tenant=tenant-a",
+          "host": ["{{baseUrl}}"],
+          "path": ["search"],
+          "query": [
+            {
+              "key": "q",
+              "value": "distributed"
+            },
+            {
+              "key": "tenant",
+              "value": "tenant-a"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Document by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Tenant-Id",
+            "value": "tenant-a"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/documents/{{documentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["documents", "{{documentId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Document",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-Tenant-Id",
+            "value": "tenant-a"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/documents/{{documentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["documents", "{{documentId}}"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "documentId",
+      "value": ""
+    }
+  ]
+}
+
