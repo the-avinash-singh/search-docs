@@ -282,7 +282,7 @@ app.delete("/documents/:id", requireTenant, rateLimit, (req: Request, res: Respo
   removeDocumentFromIndex(tenantId, id);
   clearTenantCache(tenantId);
 
-  return res.status(204).send();
+  return res.status(204).send("Delete successfull");
 });
 
 // Search endpoint (uses tenant query param to match spec)
@@ -341,4 +341,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Document search service listening on port ${PORT}`);
 });
-
