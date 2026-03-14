@@ -13,7 +13,7 @@ The focus is on **clean architecture, multi-tenancy, and production thinking**, 
   - `DELETE /documents/:id` – delete a document
   - `GET /health` – health check
 - **Multi-tenancy**:
-  - Documents endpoints use `X-Tenant-Id` header
+  - Documents endpoints use `X-Tenant-Token` header
   - Search endpoint accepts `tenant` query parameter (per assignment)
 - **In-memory search index**:
   - Simple inverted index with basic relevance ranking
@@ -69,7 +69,7 @@ The API will be available at `http://localhost:3000`.
 ```bash
 curl -X POST http://localhost:3000/documents \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-Id: tenant-a" \
+  -H "X-Tenant-Token: tenant-a" \
   -d '{
     "title": "Distributed Systems Basics",
     "content": "This document introduces distributed systems and scalability concepts.",
@@ -87,14 +87,14 @@ curl "http://localhost:3000/search?q=distributed&tenant=tenant-a"
 
 ```bash
 curl http://localhost:3000/documents/<DOCUMENT_ID> \
-  -H "X-Tenant-Id: tenant-a"
+  -H "X-Tenant-Token: tenant-a"
 ```
 
 #### 4.4 Delete a document
 
 ```bash
 curl -X DELETE http://localhost:3000/documents/<DOCUMENT_ID> \
-  -H "X-Tenant-Id: tenant-a"
+  -H "X-Tenant-Token: tenant-a"
 ```
 
 #### 4.5 Health check

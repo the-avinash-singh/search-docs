@@ -5,7 +5,7 @@
 This prototype implements a **multi-tenant document search service** that can be evolved into an enterprise-grade, horizontally scalable system. The goal of the implementation is to demonstrate solid architectural thinking (separation of concerns, clear contracts, extensibility) while keeping the runtime dependencies lightweight for local execution.
 
 - **Tech stack (prototype)**: Node.js, TypeScript, Express, in-memory storage and search index
-- **Intended production stack**: Node.js (or JVM/.NET), API gateway, OpenSearch/Elasticsearch or PostgreSQL FTS, Redis, message broker (Kafka/RabbitMQ), observability stack (Prometheus/Grafana/OpenTelemetry)
+- **Intended production stack**: Node.js (or JVM/.NET), API gateway, Elasticsearch or PostgreSQL FTS, Redis, message broker (Kafka/RabbitMQ), observability stack (Prometheus/Grafana/OpenTelemetry)
 
 The prototype focuses on:
 - Clean **API contracts**
@@ -31,20 +31,20 @@ The prototype focuses on:
               |                            |
               v                            v
       +-------+---------+          +-------+---------+
-      |  Search Service |          |  Management UI  |
-      |  (this service) |          |  / Control API  |
-      +---+------+------+\         +-----------------+
-          |      |       \
-          |      |        \
-   +------+  +---+---+   +----------+
-   | Cache |  | Index |   | Message |
-   | (Redis|  | Store |   | Broker  |
-   +---+---+  +---+---+   +----+----+
-       |          |            |
-       v          v            v
+      |  Search Service |          |Document service |
+      |  (this service) |          |                 |
+      +---+------+------+          +-----------------+
+          |      |       
+          |      |        
+   +-------+  +---+---+ 
+   | DB    |  | Index |
+   |       |  | Store |
+   +---+---+  +---+---+
+       |          |
+       v          v
    +---+----------+------------+--------------------+
-   |           Persistent Storage (Search + DB)     |
-   |  - Elasticsearch / OpenSearch indices          |
+   |           Persistent Storage                   |
+   |  - Elasticsearch                               |
    |  - PostgreSQL (metadata, tenants, auth)        |
    +-----------------------------------------------+
 ```
@@ -70,7 +70,7 @@ Client
 API Layer (Express)
   |
   | 2. Tenant resolution & validation
-  | 3. Basic validation & ID generation
+  | 3. Request Validation & ID generation
   v
 Document Service
   |
@@ -81,10 +81,10 @@ Document Service
 Response (201 + document)
 ```
 
-In a production system, step 4 would be **transactional write** to a database, and step 5 would typically be **asynchronous** via a message broker:
+In a production system, step 4 would be **preparesd statement write** to a database, and step 5 would typically be **asynchronous** via a message broker:
 - API writes document to primary store
 - Emits an `DocumentIndexed` event to Kafka/RabbitMQ
-- Dedicated indexer workers consume the event and update Elasticsearch / OpenSearch index
+- Dedicated indexer workers consume the event and update Elasticsearch index
 
 #### 3.2 Searching Documents (`GET /search?q=&tenant=`)
 
@@ -115,7 +115,7 @@ API Layer
 Response (200 + ranked results)
 ```
 
-In production, the **Search Engine** would be an Elasticsearch/OpenSearch cluster and the cache would be Redis or a managed distributed cache.
+In production, the **Search Engine** would be an Elasticsearch cluster and the cache would be Redis or a managed distributed cache.
 
 ---
 
@@ -136,7 +136,7 @@ This is intentionally simple but mirrors how a real inverted index works concept
 - **Primary database**: PostgreSQL or similar RDBMS
   - Tables: `tenants`, `documents`, `users`, `permissions`, etc.
   - Use PostgreSQL FTS or materialized views for simple deployments
-- **Search engine**: Elasticsearch / OpenSearch
+- **Search engine**: Elasticsearch 
   - Dedicated indices per tenant, or index-per-region with a `tenant_id` field
   - Sharding and replication configured for horizontal scalability
   - Index templates and analyzers tuned per language/domain
@@ -151,16 +151,16 @@ This is intentionally simple but mirrors how a real inverted index works concept
 #### 5.1 Key Endpoints
 
 - `POST /documents`
-  - Headers: `X-Tenant-Id: <tenantId>`
+  - Headers: `X-Tenant-Token: <tenantId>`
   - Body: `{ "title": string, "content": string, "metadata"?: object }`
   - Response: `201 Created` with `{ "id": string, "tenantId": string, ... }`
 
 - `GET /documents/{id}`
-  - Headers: `X-Tenant-Id: <tenantId>`
+  - Headers: `X-Tenant-Token: <tenantId>`
   - Response: `200 OK` with document, or `404` if not found in that tenant
 
 - `DELETE /documents/{id}`
-  - Headers: `X-Tenant-Id: <tenantId>`
+  - Headers: `X-Tenant-Token: <tenantId>`
   - Response: `204 No Content` or `404`
 
 - `GET /search?q={query}&tenant={tenantId}`
@@ -226,7 +226,7 @@ Benefits:
 ### 8. Multi-Tenancy & Isolation
 
 - **Prototype**:
-  - Tenant is resolved from `X-Tenant-Id` header (for document endpoints) and from `tenant` query parameter (for `/search` to match the assignment).
+  - Tenant is resolved from `X-Tenant-Token` header (for document endpoints) and from `tenant` query parameter (for `/search` to match the assignment).
   - All in-memory structures are **namespaced by tenant**:
     - `documents[tenantId][documentId]`
     - `index[tenantId][term] -> Set<documentId>`
@@ -240,7 +240,7 @@ Benefits:
   - **Physical isolation**: High-value or regulated tenants get dedicated clusters/DBs.
 
 Tenant security considerations:
-- Tenant ID should be tied to the **authenticated principal** (e.g., from JWT claims), not accepted blindly from headers.
+- user Authorization should be tied to the **authenticated principal** (e.g., from JWT claims), not accepted blindly from headers.
 - Access control performed at the **API gateway** and **service layer**, enforcing per-tenant quotas, roles, and data access policies.
 
 ---
@@ -281,7 +281,7 @@ Tenant security considerations:
 
 - **Scale-out strategy**:
   - Stateless API pods behind a load balancer (Kubernetes Deployment / HPA).
-  - Search clusters (OpenSearch/Elasticsearch) scaled horizontally via shards and replicas.
+  - Search clusters (Elasticsearch) scaled horizontally via shards and replicas.
   - Separate read/write nodes and dedicated ingestion clusters for heavy indexing workloads.
 - **Handling 100x growth**:
   - Partition tenants by region or tier to avoid hot-spot clusters.
@@ -356,19 +356,24 @@ Tenant security considerations:
 
 #### 12.1 Similar Distributed System
 
-On a previous project, I worked on a **multi-tenant reporting platform** that ingested event streams from hundreds of customer applications. The system processed tens of billions of events per day using a Kafka-based ingestion layer, a fleet of stateless services, and a columnar data store optimized for analytical queries. The core challenges were tenant isolation, schema evolution, and keeping query latencies low while the data volume grew; we addressed them with per-tenant namespaces, a contract-first schema registry, and aggressive pre-aggregation for common queries.
+On a previous project, I worked on CP Grams, a large-scale grievance and event processing platform that handled data ingestion and search across multiple government and enterprise systems. The system leveraged PostgreSQL as the primary transactional database, with Elasticsearch and vector search to power fast full-text and semantic retrieval across large datasets. One of the key components was a user complaints module, where the complaints table was partitioned by the created_at timestamp to efficiently manage high-volume time-series data and improve query performance. To ensure reliability and scalability, we implemented database replication across multiple PostgreSQL nodes, enabling high availability and read scaling. The platform also required careful handling of schema evolution and tenant isolation while maintaining low query latency as data volume grew.
 
 #### 12.2 Performance Optimization
 
-In another engagement, a critical API had P95 latencies in the seconds due to repeated N+1 queries and missing cache layers. I profiled the hot paths, consolidated queries into a few well-indexed joins, and introduced a Redis-backed cache for the most common lookups. Combined with a small amount of read-through caching and better connection pooling, this reduced P95 from multiple seconds to well under 150ms and also cut database load by more than half.
+In another engagement, a critical API was experiencing **P95 latencies in the seconds** due to repeated N+1 queries and inefficient database access patterns. I profiled the hot paths, consolidated multiple queries into a few well-indexed joins, and introduced **Redis to offload frequent reads and reduce load on the database**.
+
+Additionally, we leveraged **shared buffers** to keep frequently accessed query results and data pages readily available, which further improved response times. With improved connection pooling and these caching optimizations in place, **P95 latency dropped from multiple seconds to well under 150 ms**, while **database load was reduced by more than half**.
+
 
 #### 12.3 Production Incident Resolution
 
-I was part of the on-call rotation for a distributed system where a configuration change caused a cascading failure in one region’s search cluster. The symptoms were elevated error rates and timeouts on search endpoints. We used metrics and distributed tracing to quickly isolate the root cause to a misconfigured index template that triggered expensive queries. We rolled back the change, added guardrails to config rollout, and implemented automated query-time circuit breakers that detect pathological queries and fail them fast with a safe fallback response.
+Implemented a health monitoring service to detect system disturbances. If a service became unhealthy, it was automatically restarted, and alerts were sent to the relevant Slack channels and email groups to ensure quick visibility and response.
+
 
 #### 12.4 Architectural Trade-off Decision
 
-On a large SaaS platform, we had to choose between a single global database for all tenants (with RLS) and a **database-per-tenant** model. We ultimately went with a **hybrid approach**: most tenants shared a multi-tenant cluster with strong logical isolation, while high-value or regulated customers were placed on isolated clusters. This decision balanced operational simplicity and cost (for the shared cluster) against compliance and custom SLAs (for dedicated clusters), and it aligned the architecture with the business model.
+On a large SaaS platform, we had to choose between a **monolithic architecture and microservices**. We adopted a **hybrid approach**: less frequently used APIs and stable components remained in the monolith for simplicity, while high-traffic and performance-critical features were extracted into **dedicated microservices**. This allowed us to scale the most demanding parts of the system independently while keeping operational complexity manageable.
+
 
 ---
 
@@ -378,6 +383,7 @@ For this assessment, I used AI assistance primarily to:
 
 - Accelerate boilerplate scaffolding (Node.js/TypeScript project setup, Dockerfile, and basic Express wiring).
 - Sanity-check wording and structure of documentation sections while ensuring the architecture and trade-offs reflect my own design choices and prior experience.
+- I used cursor, ChatGPT for assistance.
 
 Design decisions (e.g., multi-tenancy model, indexing pipeline, consistency model, and production-readiness strategies) are based on patterns I have successfully used in real distributed systems.
 

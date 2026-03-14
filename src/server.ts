@@ -41,7 +41,7 @@ const RATE_LIMIT_MAX_REQUESTS_PER_TENANT = 120; // per minute (prototype)
 // Utilities
 function getTenantIdFromRequest(req: Request): TenantId | null {
   // For document endpoints we expect header; for /search we also support query param to match spec.
-  const fromHeader = (req.header("X-Tenant-Id") || req.header("x-tenant-id") || "").trim();
+  const fromHeader = (req.header("X-Tenant-Token") || req.header("x-tenant-token") || "").trim();
   const fromQuery = (req.query.tenant as string | undefined)?.trim();
   return fromQuery || fromHeader || null;
 }
@@ -153,7 +153,7 @@ function requireTenant(req: Request, res: Response, next: NextFunction) {
   if (!tenantId) {
     return res.status(400).json({
       error: "TENANT_REQUIRED",
-      message: "Tenant identifier is required (X-Tenant-Id header or tenant query param).",
+      message: "Tenant identifier is required (X-Tenant-Token header or tenant query param).",
     });
   }
   (req as any).tenantId = tenantId;
@@ -282,7 +282,7 @@ app.delete("/documents/:id", requireTenant, rateLimit, (req: Request, res: Respo
   removeDocumentFromIndex(tenantId, id);
   clearTenantCache(tenantId);
 
-  return res.status(204).send("Delete successfull");
+  return res.status(204).send();
 });
 
 // Search endpoint (uses tenant query param to match spec)

@@ -28,7 +28,7 @@
             "value": "application/json"
           },
           {
-            "key": "X-Tenant-Id",
+            "key": "X-Tenant-Token",
             "value": "tenant-a"
           }
         ],
@@ -73,7 +73,7 @@
         "method": "GET",
         "header": [
           {
-            "key": "X-Tenant-Id",
+            "key": "X-Tenant-Token",
             "value": "tenant-a"
           }
         ],
@@ -91,7 +91,7 @@
         "method": "DELETE",
         "header": [
           {
-            "key": "X-Tenant-Id",
+            "key": "X-Tenant-Token",
             "value": "tenant-a"
           }
         ],
