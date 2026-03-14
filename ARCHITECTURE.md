@@ -271,7 +271,7 @@ Tenant security considerations:
 
 - The prototype is **single-node** and optimized for local evaluation, not massive scale.
 - Authentication and authorization are **out of scope** for the prototype but are addressed in the production-readiness section.
-- Exact 500ms P95 and 1000+ QPS targets are validated at the **system level** (with a real search backend and distributed cache) rather than in this lightweight implementation.
+- Target response times such as **sub-500ms for most search requests and 1000+ queries per second** are validated at the full system level (with a real search backend and distributed cache) rather than in this lightweight implementation.
 
 ---
 
@@ -286,7 +286,7 @@ Tenant security considerations:
 - **Handling 100x growth**:
   - Partition tenants by region or tier to avoid hot-spot clusters.
   - Use index lifecycle management (ILM) and tiered storage (hot/warm/cold) for aging documents.
-  - Apply aggressive caching and query optimization to keep P95 under 500ms.
+  - Apply aggressive caching and query optimization to ensure **most search requests return in under 500ms**, even as traffic grows.
 
 #### 11.2 Resilience
 
@@ -315,7 +315,7 @@ Tenant security considerations:
 #### 11.4 Observability
 
 - **Metrics**:
-  - Request rate, latency histograms (P50/P90/P95/P99) by endpoint and tenant tier.
+  - Request rate and response time percentiles (median, slow requests, and tail latency) by endpoint and tenant tier.
   - Error rates and cause breakdown (4xx vs. 5xx).
   - Indexing throughput and lag between primary DB and search index.
 - **Logging**:
@@ -360,9 +360,9 @@ On a previous project, I worked on CP Grams, a large-scale grievance and event p
 
 #### 12.2 Performance Optimization
 
-In another engagement, a critical API was experiencing **P95 latencies in the seconds** due to repeated N+1 queries and inefficient database access patterns. I profiled the hot paths, consolidated multiple queries into a few well-indexed joins, and introduced **Redis to offload frequent reads and reduce load on the database**.
+In another engagement, a critical API was experiencing **very slow response times for some requests (several seconds)** due to repeated N+1 queries and inefficient database access patterns.
 
-Additionally, we leveraged **shared buffers** to keep frequently accessed query results and data pages readily available, which further improved response times. With improved connection pooling and these caching optimizations in place, **P95 latency dropped from multiple seconds to well under 150 ms**, while **database load was reduced by more than half**.
+Additionally, we leveraged **shared buffers** to keep frequently accessed query results and data pages readily available, which further improved response times. With improved connection pooling and these caching optimizations in place, **Response times for even the slower requests dropped from several seconds to under 150 ms**, while **database load was reduced by more than half**.
 
 
 #### 12.3 Production Incident Resolution
